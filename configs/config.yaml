@@ -1,0 +1,26 @@
+server:
+  addr: ":30083"
+  mode: "debug"
+  read_timeout_seconds: 10
+  write_timeout_seconds: 10
+
+log:
+  level: "info"
+  filename: "./logs/app.log"
+  max_size: 100
+  max_backups: 10
+  max_age: 30
+  compress: true
+  console: true
+  format: "json"
+
+auth:
+  enabled: false
+  secret: ""
+  issuer: ""
+  audience: ""
+  token_ttl_seconds: 3600
+
+tushare:
+  token: ""
+  base_url: "http://api.tushare.pro"
