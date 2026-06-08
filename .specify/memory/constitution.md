@@ -1,50 +1,133 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# stock-monitor Constitution
+<!--
+Sync Impact Report
+==================
+Version change: 1.0.0 → 1.1.0
+Modified principles: N/A (first version)
+Added sections:
+  - Principle VI: Frontend-Backend Separation (new)
+  - Technical Constraints → Frontend subsection (new)
+  - Development Workflow → Frontend subsection (new)
+Removed sections: None
+Templates requiring updates:
+  - .specify/templates/plan-template.md: ✅ aligned (Option 2 "Web application" already supports frontend+backend)
+  - .specify/templates/spec-template.md: ✅ aligned (no constitution-specific constraints)
+  - .specify/templates/tasks-template.md: ✅ aligned (already includes frontend/src/ path conventions)
+  - .specify/templates/checklist-template.md: ✅ aligned (generic)
+Follow-up TODOs: None
+Bump rationale: MINOR — new Principle VI (Frontend-Backend Separation) added, frontend constraints and workflow sections added.
+-->
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. DDF Architecture (Domain-Driven Flattening)
+Business domains are first-class directories under `domain/`. Each domain is
+self-contained: models, interfaces, services, and HTTP handlers live together in
+one package. Technical-layer directories (`internal/handler`, `internal/service`,
+`internal/repository`) are forbidden. Package names describe the domain, not the
+technical role. New domains MUST follow the same flat structure and include an
+`INDEX.md`.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Strict Dependency Discipline
+Dependencies flow inward. `pkg/*` MUST NOT import `domain/*`, `cmd/*`, or `api`.
+Domains MUST NOT import each other (e.g., `domain/market` → `domain/auth` is
+forbidden). Cross-domain collaboration occurs exclusively through the Composition
+Root (`cmd/server/main.go`). All dependency wiring, including provider injection
+and middleware assembly, is centralized in the Composition Root.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. INDEX.md Documentation
+Every directory that exports code MUST contain an `INDEX.md` describing its
+purpose, public API surface, dependency rules, and relationship to other modules.
+INDEX.md files MUST be updated whenever code is added, removed, or repackaged.
+The root `INDEX.md` serves as the project map for both humans and AI agents.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Mock-First Provider Pattern
+All external data sources MUST be abstracted behind Go interfaces defined in the
+consuming domain package. A mock implementation MUST ship before or alongside any
+real provider. Real provider implementations (e.g., Tushare, database) MUST
+implement the same interface contract. This ensures the system is testable and
+runnable without external dependencies from day one.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Phase-Gated Iteration
+Development follows a 4-phase roadmap: (1) 看得见 — visible data, (2) 发现异常 —
+anomaly detection, (3) 解释原因 — causal analysis, (4) 辅助决策 — decision support.
+Each phase has explicit entry and exit criteria defined in the root `INDEX.md`.
+Features belonging to future phases MUST NOT be built in the current phase. Scope
+creep across phase boundaries requires a constitution amendment.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### VI. Frontend-Backend Separation
+The frontend is a standalone application under `frontend/` that communicates with
+the Go backend exclusively via REST APIs. Frontend code MUST NOT contain business
+logic, data transformation rules, or domain knowledge — those belong to backend
+domain packages. The frontend is responsible for presentation, user interaction,
+and API data display only. Backend APIs MUST be designed with frontend
+consumption in mind: consistent response envelopes, meaningful HTTP status codes,
+and CORS configuration managed in `cmd/server/main.go`.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+## Technical Constraints
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+### Backend
+- **Language**: Go 1.22+ with module path `github.com/disturb-yy/stock-monitor`.
+- **HTTP Framework**: Gin; routing registered in `api/route.go`.
+- **Logging**: `log/slog` with `lumberjack` rotation via `pkg/logger`.
+- **Auth**: Stateless JWT tokens issued by `domain/auth`; no session storage.
+- **Configuration**: YAML-based via `pkg/config`; loaded at startup only.
+- **No database (Phase 1)**: Phase 1 operates entirely on in-memory mock data.
+  Database integration is deferred to a later phase and requires a constitution
+  amendment to add the storage principle.
+- **Observability**: Structured access logs (`pkg/middleware/access_log`) and
+  request ID tracing (`pkg/middleware/request_id`) on every request.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### Frontend
+- **Language**: TypeScript 5.x with React 18+ or Vue 3+ (team decision required).
+- **Build Tool**: Vite or Next.js (aligned with chosen framework).
+- **Charts**: ECharts or equivalent for financial data visualization.
+- **State Management**: Framework-native (React Context / Vue Composition API) for
+  Phase 1; dedicated state library deferred to later phases.
+- **HTTP Client**: `fetch` or `axios`; API base URL configurable via environment
+  variables.
+
+## Development Workflow
+
+### Backend
+- **Build & Run**: Use `Makefile` targets: `make run`, `make build`, `make test`,
+  `make tidy`, `make clean`.
+- **Code Changes**: Modify or add code in the appropriate domain or pkg directory;
+  register new routes in `api/route.go`; wire dependencies in
+  `cmd/server/main.go`; update the affected `INDEX.md`(s).
+- **Naming**: Package names describe the domain (e.g., `market`, `auth`). File
+  names describe the responsibility (e.g., `service.go`, `http_handler.go`).
+  Types MUST NOT repeat the package name (use `market.Service`, not
+  `market.MarketService`).
+- **Spec-Driven Development**: Features are specified via `$speckit-specify`,
+  planned via `$speckit-plan`, tasked via `$speckit-tasks`, and implemented via
+  `$speckit-implement`. All specs live under `specs/` with the branch naming
+  convention `###-feature-name`.
+
+### Frontend
+- **Dev Server**: `npm run dev` (or framework equivalent) from `frontend/`.
+- **Code Changes**: Components in `frontend/src/components/`, pages in
+  `frontend/src/pages/`, API service wrappers in `frontend/src/services/`.
+- **Naming**: React components use PascalCase files (e.g., `MarketOverview.tsx`);
+  Vue components follow Vue Style Guide conventions.
+- **Spec-Driven**: Frontend features follow the same `$speckit-*` workflow.
+  A frontend feature spec SHOULD reference the backend API contract it consumes.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes all other development practices. Amendments require:
+1. A documented rationale in the Sync Impact Report at the top of this file.
+2. A version bump following semantic versioning (MAJOR for principle
+   removal/redefinition, MINOR for new principles/sections, PATCH for
+   clarifications).
+3. Propagation checks against all `.specify/templates/` files and the root
+   `INDEX.md`.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+Compliance is verified at the Constitution Check gate in every implementation
+plan (`$speckit-plan`). Any deviation from DDF dependency rules or phase
+boundaries MUST be explicitly justified in the plan's Complexity Tracking table.
+
+Runtime development guidance is provided by the root `INDEX.md` and per-domain
+`INDEX.md` files.
+
+**Version**: 1.1.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-08

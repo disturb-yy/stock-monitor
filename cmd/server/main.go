@@ -35,12 +35,19 @@ func main() {
 	})
 	defer logger.Sync()
 
-	// --- Infrastructure ---
-	tushareClient := tushare.New(cfg.Tushare.Token, tushare.WithBaseURL(cfg.Tushare.BaseURL))
-
 	// --- Domain: market ---
-	marketProvider := market.NewMockProvider()
-	_ = tushareClient // reserved for market.NewTushareProvider(tushareClient)
+	var marketProvider market.Provider
+	if cfg.Provider.Type == "tushare" {
+		tushareClient := tushare.New(cfg.Tushare.Token,
+			tushare.WithBaseURL(cfg.Tushare.BaseURL),
+			tushare.WithHTTPClient(&http.Client{
+				Timeout: time.Duration(cfg.Tushare.Timeout) * time.Second,
+			}),
+		)
+		marketProvider = market.NewTushareProvider(tushareClient)
+	} else {
+		marketProvider = market.NewMockProvider()
+	}
 	marketService := market.NewService(marketProvider)
 	marketHandler := market.NewHTTPHandler(marketService)
 

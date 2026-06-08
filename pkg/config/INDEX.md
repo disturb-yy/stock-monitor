@@ -51,7 +51,7 @@ type AuthConfig struct {
 }
 
 type TushareConfig struct {
-    Token   string  // Tushare API token
+    Token   string  // Tushare API token（可通过 TUSHARE_TOKEN 环境变量覆盖）
     BaseURL string  // Tushare API 地址，默认 "http://api.tushare.pro"
 }
 ```
@@ -72,7 +72,8 @@ func (c AuthConfig) AuthConfig() auth.Config  // 转换为 domain/auth.Config
 ## 配置来源
 
 - 默认路径：`configs/config.yaml`
-- 环境变量覆盖：`CONFIG_PATH`
+- 环境变量覆盖：`CONFIG_PATH`（指定配置文件路径）、`TUSHARE_TOKEN`（覆盖 tushare.token）
+- 环境变量优先级高于 YAML 文件值
 - 默认值：`defaultConfig()` 内部函数
 
 ## 依赖

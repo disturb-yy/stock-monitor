@@ -78,10 +78,26 @@ client := tushare.New(token, tushare.WithBaseURL("http://api.tushare.pro"))
 items, err := client.IndexDaily(ctx, "000001.SH", "20240101", "20240131")
 ```
 
+## 注入指南
+
+本包提供的 `Client` 由 Composition Root（`cmd/server/main.go`）根据配置创建并注入：
+
+```go
+tushareClient := tushare.New(cfg.Tushare.Token,
+    tushare.WithBaseURL(cfg.Tushare.BaseURL),
+    tushare.WithHTTPClient(&http.Client{
+        Timeout: time.Duration(cfg.Tushare.Timeout) * time.Second,
+    }),
+)
+marketProvider = market.NewTushareProvider(tushareClient)
+```
+
+Token 通过 `TUSHARE_TOKEN` 环境变量提供（优先级高于 `config.yaml`）。
+
 ## 指南
 
 - 本包只封装 Tushare HTTP API 调用，不含业务模型转换
-- 将 `IndexDailyItem` 转换为 `market.IndexQuote` 的逻辑应在 `domain/market/tushare_provider.go` 中实现
+- 将 `IndexDailyItem` 转换为 `market.IndexQuote` 的逻辑在 `domain/market/tushare_provider.go` 中实现
 - 新增 Tushare API 时，在 `client.go` 中添加方法，在 `types.go` 中添加对应的 Item 类型
 
 ## 依赖

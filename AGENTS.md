@@ -1,4 +1,3 @@
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+当前实施计划: specs/001-tushare-real-provider/plan.md
 <!-- SPECKIT END -->
