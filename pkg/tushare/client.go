@@ -12,33 +12,32 @@ import (
 )
 
 const (
-	defaultBaseURL = "http://api.tushare.pro"
-	defaultTimeout = 30 * time.Second
+	defaultBaseURL = "http://api.tushare.pro" // 默认 API 地址
+	defaultTimeout = 30 * time.Second          // 默认请求超时
 )
 
-// Client is a lightweight Tushare Pro HTTP API client.
+// Client 是 Tushare Pro HTTP API 的轻量客户端。
 type Client struct {
 	baseURL string
 	token   string
 	http    *http.Client
 }
 
-// Option configures a Client.
+// Option 为 Client 的函数式配置选项。
 type Option func(*Client)
 
-// WithBaseURL overrides the default Tushare API endpoint.
+// WithBaseURL 覆盖默认的 API 地址。
 func WithBaseURL(url string) Option {
 	return func(c *Client) { c.baseURL = strings.TrimRight(url, "/") }
 }
 
-// WithHTTPClient replaces the underlying HTTP client.
+// WithHTTPClient 替换底层 HTTP 客户端。
 func WithHTTPClient(hc *http.Client) Option {
 	return func(c *Client) { c.http = hc }
 }
 
-// New creates a new Tushare client.
-//
-//	token is your Tushare Pro API token.
+// New 创建 Tushare 客户端。
+// token 为 Tushare Pro API Token。
 func New(token string, opts ...Option) *Client {
 	c := &Client{
 		baseURL: defaultBaseURL,
@@ -53,9 +52,8 @@ func New(token string, opts ...Option) *Client {
 	return c
 }
 
-// Do send a generic API request and returns the parsed Response.
-// An error is returned only for transport / I/O failures; business errors
-// (non-zero Code) are surfaced inside the Response object.
+// Do 发送通用 API 请求并返回解析后的 Response。
+// 传输/IO 错误返回 error；业务错误（Code != 0）同时返回 error 和 Response。
 func (c *Client) Do(ctx context.Context, apiName string, params map[string]any, fields ...string) (*Response, error) {
 	body := Request{
 		APIName: apiName,
@@ -102,11 +100,10 @@ func (c *Client) Do(ctx context.Context, apiName string, params map[string]any, 
 	return &result, nil
 }
 
-// IndexDaily returns daily K-line data for stock indices.
-//
-//	tsCode:  index code, e.g. "000001.SH", "399001.SZ"
-//	start / end date: optional, format "YYYYMMDD". Pass empty strings to omit.
-//	fields: optional field names to limit the response columns.
+// IndexDaily 查询指数日线 K 线数据。
+// tsCode: 指数代码，如 "000001.SH"
+// startDate / endDate: 日期范围 YYYYMMDD，空字符串表示不限制
+// fields: 可选字段名列表，不传使用默认全部字段
 func (c *Client) IndexDaily(ctx context.Context, tsCode string, startDate, endDate string, fields ...string) ([]IndexDailyItem, error) {
 	params := map[string]any{"ts_code": tsCode}
 	if startDate != "" {
@@ -136,19 +133,27 @@ func (c *Client) IndexDaily(ctx context.Context, tsCode string, startDate, endDa
 	return items, nil
 }
 
-// toFloat64 coerces a json.Number / float64 / int to float64.
-func toFloat64(v any) (float64, bool) {
-	switch val := v.(type) {
-	case float64:
-		return val, true
-	case json.Number:
-		f, err := val.Float64()
-		return f, err == nil
-	case int:
-		return float64(val), true
-	case int64:
-		return float64(val), true
-	default:
-		return 0, false
+// TradeCal 查询交易日历数据。
+// exchange: 交易所代码，如 "SSE"（上交所）、"SZSE"（深交所）
+// startDate / endDate: 日期范围 YYYYMMDD
+func (c *Client) TradeCal(ctx context.Context, exchange, startDate, endDate string) ([]TradeCalItem, error) {
+	params := map[string]any{
+		"exchange":   exchange,
+		"start_date": startDate,
+		"end_date":   endDate,
 	}
+
+	resp, err := c.Do(ctx, "trade_cal", params, tradeCalFields...)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Data == nil || len(resp.Data.Items) == 0 {
+		return nil, nil
+	}
+
+	items := make([]TradeCalItem, 0, len(resp.Data.Items))
+	for _, row := range resp.Data.Items {
+		items = append(items, parseTradeCalItem(resp.Data.Fields, row))
+	}
+	return items, nil
 }

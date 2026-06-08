@@ -41,3 +41,24 @@ tushare:
       name: "沪深300"
     - symbol: "000905.SH"
       name: "中证500"
+
+calendar:
+  cache_file: "data/trading_calendar.json"
+  update_interval_days: 7
+  lookback_months: 6
+  lookahead_months: 6
+
+anomaly:
+  enabled: true
+  rules:
+    - type: price_change
+      upper_threshold: 3.0
+      lower_threshold: -2.0
+      enabled: true
+    - type: volume_spike
+      lookback_days: 5
+      spike_multiplier: 2.0
+      enabled: true
+    - type: consecutive
+      days: 5
+      enabled: true

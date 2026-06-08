@@ -113,6 +113,12 @@ and CORS configuration managed in `cmd/server/main.go`.
 - **Spec-Driven**: Frontend features follow the same `$speckit-*` workflow.
   A frontend feature spec SHOULD reference the backend API contract it consumes.
 
+### VI. 中文注释（MANDATORY）
+所有 Go 源代码必须使用中文注释。包级别、导出的类型/函数/方法、
+结构体字段均需有中文说明。关键代码段（计算公式、降级策略、
+边界条件处理）需有解释性注释。日志和错误消息也使用中文。
+
+
 ## Governance
 
 This constitution supersedes all other development practices. Amendments require:

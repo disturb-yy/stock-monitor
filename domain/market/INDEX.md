@@ -12,6 +12,7 @@
 | `provider.go` | `Provider` 接口：行情数据源契约 |
 | `mock_provider.go` | `MockProvider`：A 股模拟数据实现 |
 | `tushare_provider.go` | `TushareProvider`：Tushare 真实数据源（已实现） |
+| `calendar.go` | `TradingCalendar`：A 股交易日历缓存与查询 |
 | `service.go` | `Service`：业务服务，委托 Provider 查询 |
 | `http_handler.go` | `HTTPHandler`：Gin HTTP 适配层 |
 

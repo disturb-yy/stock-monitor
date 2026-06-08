@@ -10,7 +10,7 @@ import (
 	"github.com/disturb-yy/stock-monitor/pkg/tushare"
 )
 
-// indexNames maps Tushare index symbols to human-readable names.
+// indexNames 为 Tushare 指数代码到中文名称的映射表。
 var indexNames = map[string]string{
 	"000001.SH": "上证指数",
 	"399001.SZ": "深证成指",
@@ -20,89 +20,92 @@ var indexNames = map[string]string{
 	"000905.SH": "中证500",
 }
 
+// TushareProvider 使用 Tushare Pro API 提供真实 A 股行情数据。
+// 实现 market.Provider 接口。
 type TushareProvider struct {
-	client *tushare.Client
+	client   *tushare.Client   // Tushare HTTP 客户端
+	calendar *TradingCalendar  // 交易日历（用于节假日/调休判断）
 }
 
-func NewTushareProvider(client *tushare.Client) *TushareProvider {
-	return &TushareProvider{client: client}
+// NewTushareProvider 创建 Tushare 行情数据源。
+// calendar 可为 nil，此时回退为简单周末判断。
+func NewTushareProvider(client *tushare.Client, calendar *TradingCalendar) *TushareProvider {
+	return &TushareProvider{
+		client:   client,
+		calendar: calendar,
+	}
 }
 
+// Market 返回当前服务的市场标识。
 func (p *TushareProvider) Market() Market {
 	return MarketCNA
 }
 
-// GetMarketStatus determines the current A-share market session based on
-// server local time and the standard trading schedule (Asia/Shanghai).
+// GetMarketStatus 获取当前 A 股市场状态。
+// 判断逻辑：先通过交易日历判断是否为交易日，
+// 再通过服务器本地时间判断当前交易时段。
 func (p *TushareProvider) GetMarketStatus(ctx context.Context) (*MarketSession, error) {
+	// 加载上海时区
 	loc, err := time.LoadLocation("Asia/Shanghai")
 	if err != nil {
 		loc = time.FixedZone("CST", 8*3600)
 	}
 	now := time.Now().In(loc)
 
-	status, isTrading := determineMarketSession(now)
-	tradeDate := now.Format("2006-01-02")
-
-	// On weekends or after close, try to get the latest trade date from API
-	if status == MarketStatusClosed {
-		if latestDate := p.latestTradeDate(ctx); latestDate != "" {
-			tradeDate = latestDate
+	// 第一步：交易日历判断
+	if p.calendar != nil && !p.calendar.IsTradingDay(now) {
+		tradeDate := now.Format("2006-01-02")
+		if td, ok := p.calendar.LastTradeDate(now); ok {
+			tradeDate = td
 		}
+		return &MarketSession{
+			Market:    MarketCNA,
+			Status:    MarketStatusClosed,
+			IsTrading: false,
+			TradeDate: tradeDate,
+			Timezone:  "Asia/Shanghai",
+			UpdatedAt: time.Now(),
+		}, nil
 	}
+
+	// 第二步：时段判断
+	status, isTrading := determineMarketSession(now)
 
 	return &MarketSession{
 		Market:    MarketCNA,
 		Status:    status,
 		IsTrading: isTrading,
-		TradeDate: tradeDate,
+		TradeDate: now.Format("2006-01-02"),
 		Timezone:  "Asia/Shanghai",
 		UpdatedAt: time.Now(),
 	}, nil
 }
 
-// determineMarketSession returns the market status and whether trading is active
-// based on the given time in Asia/Shanghai timezone.
+// determineMarketSession 根据上海时间判断当前所处的交易时段。
+// 交易日判断由调用方完成（日历或周末判断）。
 func determineMarketSession(t time.Time) (MarketStatus, bool) {
-	weekday := t.Weekday()
-
-	// Weekend: always closed
-	if weekday == time.Saturday || weekday == time.Sunday {
-		return MarketStatusClosed, false
-	}
-
 	hour := t.Hour()
 	minute := t.Minute()
 	now := hour*60 + minute
 
 	switch {
 	case now < 9*60+15:
-		return MarketStatusPreOpen, false
+		return MarketStatusPreOpen, false // 凌晨至开盘前
 	case now < 9*60+30:
-		return MarketStatusPreOpen, false
+		return MarketStatusPreOpen, false // 集合竞价时段
 	case now < 11*60+30:
-		return MarketStatusTrading, true
+		return MarketStatusTrading, true  // 上午交易时段
 	case now < 13*60:
-		return MarketStatusLunchBreak, false
+		return MarketStatusLunchBreak, false // 午间休市
 	case now < 15*60:
-		return MarketStatusTrading, true
+		return MarketStatusTrading, true  // 下午交易时段
 	default:
-		return MarketStatusClosed, false
+		return MarketStatusClosed, false  // 收盘后
 	}
 }
 
-// latestTradeDate fetches the most recent trade date from the index_daily API.
-func (p *TushareProvider) latestTradeDate(ctx context.Context) string {
-	items, err := p.client.IndexDaily(ctx, "000001.SH", "", "", "trade_date")
-	if err != nil || len(items) == 0 {
-		return ""
-	}
-	return items[0].TradeDate
-}
-
-// GetIndexQuotes fetches real index quotes concurrently for all configured
-// indices. Partial failures are tolerated: successful results are returned
-// alongside aggregated error information.
+// GetIndexQuotes 并发获取所有追踪指数的实时行情。
+// 单个指数查询失败不影响其余指数，返回成功结果 + 汇总错误信息。
 func (p *TushareProvider) GetIndexQuotes(ctx context.Context) ([]IndexQuote, error) {
 	type indexEntry struct{ Symbol, Name string }
 	var indices []indexEntry
@@ -119,6 +122,7 @@ func (p *TushareProvider) GetIndexQuotes(ctx context.Context) ([]IndexQuote, err
 	results := make([]result, len(indices))
 	var wg sync.WaitGroup
 
+	// 并发查询各指数
 	for i, idx := range indices {
 		wg.Add(1)
 		go func(i int, symbol, name string) {
@@ -129,6 +133,7 @@ func (p *TushareProvider) GetIndexQuotes(ctx context.Context) ([]IndexQuote, err
 	}
 	wg.Wait()
 
+	// 收集成功与失败结果
 	var quotes []IndexQuote
 	var errs []string
 	for _, r := range results {
@@ -152,10 +157,9 @@ func (p *TushareProvider) GetIndexQuotes(ctx context.Context) ([]IndexQuote, err
 	return quotes, retErr
 }
 
-// fetchIndexQuote fetches a single index quote by querying the latest daily
-// K-line and previous day close.
+// fetchIndexQuote 获取单个指数的当日行情（含昨收价）。
 func (p *TushareProvider) fetchIndexQuote(ctx context.Context, symbol, name string) (IndexQuote, error) {
-	// Fetch latest trading day data
+	// 获取最新交易日数据
 	items, err := p.client.IndexDaily(ctx, symbol, "", "")
 	if err != nil {
 		return IndexQuote{}, fmt.Errorf("query %s: %w", symbol, err)
@@ -166,16 +170,16 @@ func (p *TushareProvider) fetchIndexQuote(ctx context.Context, symbol, name stri
 
 	latest := items[0]
 
-	// Fetch previous close
+	// 获取昨收价
 	preClose, err := p.fetchPreClose(ctx, symbol, latest.TradeDate)
 	if err != nil {
-		preClose = latest.Close // fallback: use close as preClose
+		preClose = latest.Close // 降级：用当日收盘价
 	}
 
 	return mapToIndexQuote(symbol, name, latest, preClose), nil
 }
 
-// fetchPreClose retrieves the closing price of the previous trading day.
+// fetchPreClose 获取指定交易日前一个交易日的收盘价。
 func (p *TushareProvider) fetchPreClose(ctx context.Context, symbol, currentTradeDate string) (float64, error) {
 	items, err := p.client.IndexDaily(ctx, symbol, "", currentTradeDate, "close")
 	if err != nil {
@@ -187,7 +191,7 @@ func (p *TushareProvider) fetchPreClose(ctx context.Context, symbol, currentTrad
 	return items[1].Close, nil
 }
 
-// mapToIndexQuote converts a Tushare IndexDailyItem into a domain IndexQuote.
+// mapToIndexQuote 将 Tushare 日线数据映射为领域 IndexQuote 模型。
 func mapToIndexQuote(symbol, name string, item tushare.IndexDailyItem, preClose float64) IndexQuote {
 	change := item.Close - preClose
 	changePercent := 0.0
@@ -212,8 +216,7 @@ func mapToIndexQuote(symbol, name string, item tushare.IndexDailyItem, preClose 
 	}
 }
 
-// GetMarketOverview aggregates market status and all index quotes into a
-// comprehensive market overview with summary statistics.
+// GetMarketOverview 聚合市场状态和指数行情，生成大盘总览。
 func (p *TushareProvider) GetMarketOverview(ctx context.Context) (*MarketOverview, error) {
 	session, err := p.GetMarketStatus(ctx)
 	if err != nil {
@@ -237,7 +240,7 @@ func (p *TushareProvider) GetMarketOverview(ctx context.Context) (*MarketOvervie
 	}, nil
 }
 
-// calculateMarketSummary computes rising/falling/flat counts and total amount.
+// calculateMarketSummary 计算涨/跌/平盘指数数量和总成交额。
 func calculateMarketSummary(quotes []IndexQuote) MarketSummary {
 	var s MarketSummary
 	var totalAmount float64
