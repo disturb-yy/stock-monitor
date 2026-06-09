@@ -1,1 +1,3 @@
-{"feature_directory": "specs/004-scheduled-collection"}
+{
+  "feature_directory": "specs/005-webhook-alerts"
+}

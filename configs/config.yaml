@@ -69,3 +69,10 @@ anomaly:
     - type: consecutive
       days: 5
       enabled: true
+
+webhook:
+  enabled: false
+  webhook_url: ""
+  cooldown_minutes: 30
+  retry_count: 3
+  retry_interval_seconds: 30

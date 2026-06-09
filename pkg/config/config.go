@@ -24,6 +24,7 @@ type Config struct {
 	Tushare  TushareConfig  `yaml:"tushare"`  // Tushare API 配置
 	Calendar CalendarConfig `yaml:"calendar"` // 交易日历配置
 	Anomaly   AnomalyConfig   `yaml:"anomaly"`   // 异动检测配置
+	Webhook   WebhookConfig   `yaml:"webhook"`   // Webhook 告警推送配置
 	Collector CollectorConfig `yaml:"collector"` // 定时采集配置
 }
 
@@ -106,6 +107,15 @@ type CollectorConfig struct {
 	Enabled         bool `yaml:"enabled"`          // 是否启用定时采集
 	IntervalMinutes int  `yaml:"interval_minutes"` // 采集间隔（分钟）
 	MaxHistoryDays  int  `yaml:"max_history_days"` // 每个指数内存最多保留天数
+}
+
+// WebhookConfig 为 Webhook 告警推送配置。
+type WebhookConfig struct {
+	Enabled              bool   `yaml:"enabled"`                 // 是否启用 Webhook 推送
+	WebhookURL           string `yaml:"webhook_url"`             // 企业微信机器人 Webhook URL
+	CooldownMinutes      int    `yaml:"cooldown_minutes"`        // 冷却时间（分钟），0 禁用
+	RetryCount           int    `yaml:"retry_count"`             // 最大重试次数
+	RetryIntervalSeconds int    `yaml:"retry_interval_seconds"`  // 重试间隔（秒）
 }
 
 // AuthConfig 转换为 domain/auth.Config 格式。

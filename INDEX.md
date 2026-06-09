@@ -199,3 +199,8 @@ HTTP Request
 | `pkg/middleware/` | [`pkg/middleware/INDEX.md`](pkg/middleware/INDEX.md) |
 | `pkg/router/` | [`pkg/router/INDEX.md`](pkg/router/INDEX.md) |
 | `pkg/tushare/` | [`pkg/tushare/INDEX.md`](pkg/tushare/INDEX.md) |
+
+## notify 领域
+
+`domain/notify/` — Webhook 告警推送，支持企业微信群机器人。
+详见 [`domain/notify/INDEX.md`](domain/notify/INDEX.md)
