@@ -83,7 +83,7 @@ type Service
 
 ```go
 type HTTPHandler
-    func NewHTTPHandler(service *Service) *HTTPHandler
+    func NewHTTPHandler(service *Service, historyStore *HistoryStore, sqliteStore *SQLiteStore) *HTTPHandler
     func (h *HTTPHandler) GetMarketStatus(c *gin.Context)
     func (h *HTTPHandler) GetMarketIndices(c *gin.Context)
     func (h *HTTPHandler) GetHistory(c *gin.Context)
@@ -114,3 +114,15 @@ type HTTPHandler
 2. 提供构造函数（如 `NewXxxProvider(...) *XxxProvider`）
 3. 在 `cmd/server/main.go` 中创建实例并注入 `NewService(provider)`
 4. 不要将 Provider 接口或实现放在 `pkg/` 下
+
+## SQLite 持久化
+
+`SQLiteStore` (`sqlite_store.go`) 提供 HistoryStore 的磁盘持久化：
+- `Open(path)` — 打开/创建数据库，自动建表，损坏时自动重建
+- `Flush(quotes)` — 批量写入（INSERT OR REPLACE）
+- `LoadRecent(maxDays)` — 加载最近 N 天数据到内存
+- `Query(symbol, start, end)` — 按日期范围查询（用于内存范围外回退）
+- `PurgeBefore(maxDays)` — 清理过期记录
+- `IsCorrupt()` — PRAGMA integrity_check 完整性检测
+
+启用方式：`config.yaml` 中 `persistence.enabled: true`

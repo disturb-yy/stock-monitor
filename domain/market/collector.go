@@ -115,6 +115,22 @@ func (s *HistoryStore) Query(symbol, start, end string) (map[string][]IndexQuote
 	return result, nil
 }
 
+// LoadFromSQLite 从 SQLite 加载最近 maxDays 天的行情数据到内存。
+func (s *HistoryStore) LoadFromSQLite(st *SQLiteStore) error {
+	if st == nil {
+		return nil
+	}
+	quotes, err := st.LoadRecent(s.maxDays)
+	if err != nil {
+		return err
+	}
+	for _, q := range quotes {
+		s.Append(q.Symbol, q)
+	}
+	slog.Info("market: 已从 SQLite 加载历史数据", "days", s.maxDays, "records", len(quotes))
+	return nil
+}
+
 // Len 返回当前存储的指数总数。
 func (s *HistoryStore) Len() int {
 	s.mu.RLock()
@@ -130,6 +146,8 @@ type Collector struct {
 	store       *HistoryStore     // 内存历史存储
 	calendar    *TradingCalendar  // 交易日历（判断采集时机）
 	intervalMin int               // 采集间隔（分钟）
+	sqlite       *SQLiteStore     // SQLite 持久化存储（可为 nil）
+	maxPurgeDays int              // SQLite 最大保留天数
 
 	ticker *time.Ticker
 	done   chan struct{}
@@ -138,13 +156,15 @@ type Collector struct {
 // NewCollector 创建定时采集器。
 // provider 为 TushareProvider 实例，store 为历史存储，
 // calendar 用于交易日判断，intervalMinutes 为采集间隔（分钟）。
-func NewCollector(provider *TushareProvider, store *HistoryStore, calendar *TradingCalendar, intervalMinutes int) *Collector {
+func NewCollector(provider *TushareProvider, store *HistoryStore, calendar *TradingCalendar, intervalMinutes int, sqlite *SQLiteStore, maxPurgeDays int) *Collector {
 	return &Collector{
-		provider:    provider,
-		store:       store,
-		calendar:    calendar,
-		intervalMin: intervalMinutes,
-		done:        make(chan struct{}),
+		provider:     provider,
+		store:        store,
+		calendar:     calendar,
+		intervalMin:  intervalMinutes,
+		sqlite:       sqlite,
+		maxPurgeDays: maxPurgeDays,
+		done:         make(chan struct{}),
 	}
 }
 
@@ -222,6 +242,17 @@ func (c *Collector) collect(ctx context.Context) {
 
 	for _, q := range quotes {
 		c.store.Append(q.Symbol, q)
+	}
+
+	// SQLite 持久化写入
+	if c.sqlite != nil {
+		if err := c.sqlite.Flush(quotes); err != nil {
+			slog.Warn("SQLite 持久化写入失败", "error", err)
+		}
+		// 清理过期数据
+		if err := c.sqlite.PurgeBefore(c.maxPurgeDays); err != nil {
+			slog.Warn("SQLite 过期数据清理失败", "error", err)
+		}
 	}
 
 	slog.Info("采集完成", "count", len(quotes))

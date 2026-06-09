@@ -25,6 +25,7 @@ type Config struct {
 	Calendar CalendarConfig `yaml:"calendar"` // 交易日历配置
 	Anomaly   AnomalyConfig   `yaml:"anomaly"`   // 异动检测配置
 	Webhook   WebhookConfig   `yaml:"webhook"`   // Webhook 告警推送配置
+	Persistence PersistenceConfig `yaml:"persistence"` // SQLite 持久化配置
 	Collector CollectorConfig `yaml:"collector"` // 定时采集配置
 }
 
@@ -116,6 +117,13 @@ type WebhookConfig struct {
 	CooldownMinutes      int    `yaml:"cooldown_minutes"`        // 冷却时间（分钟），0 禁用
 	RetryCount           int    `yaml:"retry_count"`             // 最大重试次数
 	RetryIntervalSeconds int    `yaml:"retry_interval_seconds"`  // 重试间隔（秒）
+}
+
+// PersistenceConfig 为 SQLite 持久化配置。
+type PersistenceConfig struct {
+	Enabled bool   `yaml:"enabled"`  // 是否启用 SQLite 持久化
+	DBPath  string `yaml:"db_path"` // SQLite 数据文件路径
+	MaxDays int    `yaml:"max_days"` // 最大保留天数
 }
 
 // AuthConfig 转换为 domain/auth.Config 格式。

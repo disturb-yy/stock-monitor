@@ -194,19 +194,37 @@ func setupMarket(ctx context.Context, cfg *config.Config, cal *market.TradingCal
 	// 历史存储 + 定时采集器（仅 Tushare 模式且启用时）
 	var store *market.HistoryStore
 	var collector *market.Collector
+	var sqliteStore *market.SQLiteStore
 	if cfg.Provider.Type == "tushare" && cfg.Collector.Enabled {
 		store = market.NewHistoryStore(cfg.Collector.MaxHistoryDays)
+
+		// SQLite 持久化：启动时加载历史数据
+		if cfg.Persistence.Enabled {
+			var err error
+			sqliteStore, err = market.Open(cfg.Persistence.DBPath)
+			if err != nil {
+				slog.Warn("SQLite 持久化初始化失败，仅使用内存存储", "error", err)
+				sqliteStore = nil
+			} else {
+				if err := store.LoadFromSQLite(sqliteStore); err != nil {
+					slog.Warn("从 SQLite 加载历史数据失败", "error", err)
+				}
+			}
+		}
+
 		collector = market.NewCollector(
 			provider.(*market.TushareProvider),
 			store,
 			cal,
 			cfg.Collector.IntervalMinutes,
+			sqliteStore,
+			cfg.Persistence.MaxDays,
 		)
 		collector.Start(ctx)
 	}
 
 	service := market.NewService(provider)
-	handler := market.NewHTTPHandler(service, store)
+	handler := market.NewHTTPHandler(service, store, sqliteStore)
 	return handler, collector
 }
 

@@ -2,20 +2,18 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.0.0 → 1.1.0
-Modified principles: N/A (first version)
-Added sections:
-  - Principle VI: Frontend-Backend Separation (new)
-  - Technical Constraints → Frontend subsection (new)
-  - Development Workflow → Frontend subsection (new)
+Version change: 1.1.0 → 1.1.1
+Modified sections:
+  - Technical Constraints → Backend: "No database (Phase 1)" 改为 "SQLite 持久化 (Phase 2+)"
+Added sections: None
 Removed sections: None
 Templates requiring updates:
-  - .specify/templates/plan-template.md: ✅ aligned (Option 2 "Web application" already supports frontend+backend)
+  - .specify/templates/plan-template.md: ✅ aligned (技术上下文已支持 Storage 字段)
   - .specify/templates/spec-template.md: ✅ aligned (no constitution-specific constraints)
-  - .specify/templates/tasks-template.md: ✅ aligned (already includes frontend/src/ path conventions)
-  - .specify/templates/checklist-template.md: ✅ aligned (generic)
+  - .specify/templates/tasks-template.md: ✅ aligned (no impact)
+  - .specify/templates/checklist-template.md: ✅ aligned (no impact)
 Follow-up TODOs: None
-Bump rationale: MINOR — new Principle VI (Frontend-Backend Separation) added, frontend constraints and workflow sections added.
+Bump rationale: PATCH — 放宽技术约束，允许 Phase 2+ 引入 SQLite 作为轻量持久化方案（不引入新原则，仅修改现有约束条款）。
 -->
 
 ## Core Principles
@@ -72,9 +70,9 @@ and CORS configuration managed in `cmd/server/main.go`.
 - **Logging**: `log/slog` with `lumberjack` rotation via `pkg/logger`.
 - **Auth**: Stateless JWT tokens issued by `domain/auth`; no session storage.
 - **Configuration**: YAML-based via `pkg/config`; loaded at startup only.
-- **No database (Phase 1)**: Phase 1 operates entirely on in-memory mock data.
-  Database integration is deferred to a later phase and requires a constitution
-  amendment to add the storage principle.
+- **SQLite 持久化 (Phase 2+)**: Phase 2 及之后阶段允许使用 SQLite 作为轻量级本地持久化方案。
+  SQLite 作为内存存储的补充（非替代），用于实现重启后数据恢复和历史数据扩展查询。
+  禁止引入客户端-服务器型数据库（MySQL、PostgreSQL 等），该决策需单独的 amendment。
 - **Observability**: Structured access logs (`pkg/middleware/access_log`) and
   request ID tracing (`pkg/middleware/request_id`) on every request.
 
@@ -136,4 +134,4 @@ boundaries MUST be explicitly justified in the plan's Complexity Tracking table.
 Runtime development guidance is provided by the root `INDEX.md` and per-domain
 `INDEX.md` files.
 
-**Version**: 1.1.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-08
+**Version**: 1.1.1 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-10

@@ -76,3 +76,8 @@ webhook:
   cooldown_minutes: 30
   retry_count: 3
   retry_interval_seconds: 30
+
+persistence:
+  enabled: true
+  db_path: "data/market_history.db"
+  max_days: 90

@@ -8,19 +8,18 @@ import (
 )
 
 // HTTPHandler 是行情领域的 HTTP 适配层。
-// 将 Gin 的 HTTP 请求转换为对 Service 的调用。
 type HTTPHandler struct {
 	service      *Service       // 行情业务服务
 	historyStore *HistoryStore  // 历史行情存储（采集器填充）
+	sqliteStore  *SQLiteStore   // SQLite 持久化存储（可为 nil）
 }
 
 // NewHTTPHandler 创建行情 HTTP 处理器。
-func NewHTTPHandler(service *Service, historyStore *HistoryStore) *HTTPHandler {
-	return &HTTPHandler{service: service, historyStore: historyStore}
+func NewHTTPHandler(service *Service, historyStore *HistoryStore, sqliteStore *SQLiteStore) *HTTPHandler {
+	return &HTTPHandler{service: service, historyStore: historyStore, sqliteStore: sqliteStore}
 }
 
 // GetMarketStatus 处理 GET /api/market/status 请求。
-// 返回当前 A 股市场的交易状态。
 func (h *HTTPHandler) GetMarketStatus(c *gin.Context) {
 	session, err := h.service.GetMarketStatus(c.Request.Context())
 	if err != nil {
@@ -38,7 +37,6 @@ func (h *HTTPHandler) GetMarketStatus(c *gin.Context) {
 }
 
 // GetMarketIndices 处理 GET /api/market/indices 请求。
-// 返回所有追踪指数的实时行情数据。
 func (h *HTTPHandler) GetMarketIndices(c *gin.Context) {
 	quotes, err := h.service.GetIndexQuotes(c.Request.Context())
 	if err != nil {
@@ -57,8 +55,8 @@ func (h *HTTPHandler) GetMarketIndices(c *gin.Context) {
 
 
 // GetHistory 处理 GET /api/market/history 请求。
-// 查询指定指数在日期范围内的历史行情数据（采集器自动填充）。
-// 参数：start（起始日期，必填）、end（截止日期，可选）、symbol（指数代码，可选）。
+// 优先查询内存 HistoryStore；如日期范围超出内存覆盖或结果不完整，
+// 回退到 SQLite 查询并合并（内存结果优先）。
 func (h *HTTPHandler) GetHistory(c *gin.Context) {
 	start := c.Query("start")
 	symbol := c.Query("symbol")
@@ -81,6 +79,7 @@ func (h *HTTPHandler) GetHistory(c *gin.Context) {
 		return
 	}
 
+	// 1. 查询内存
 	result, err := h.historyStore.Query(symbol, start, end)
 	if err != nil {
 		httputil.Response(c, http.StatusBadRequest, httputil.Resp{
@@ -88,6 +87,14 @@ func (h *HTTPHandler) GetHistory(c *gin.Context) {
 			Msg:  err.Error(),
 		})
 		return
+	}
+
+	// 2. 如内存结果不完整，回退到 SQLite
+	if h.sqliteStore != nil && isIncomplete(result) {
+		sqliteQuotes, err := h.sqliteStore.Query(symbol, start, end)
+		if err == nil {
+			mergeFromSQLite(result, sqliteQuotes)
+		}
 	}
 
 	httputil.Response(c, http.StatusOK, httputil.Resp{
@@ -98,7 +105,6 @@ func (h *HTTPHandler) GetHistory(c *gin.Context) {
 }
 
 // GetMarketOverview 处理 GET /api/market/overview 请求。
-// 返回市场状态 + 所有指数行情 + 涨跌统计的总览快照。
 func (h *HTTPHandler) GetMarketOverview(c *gin.Context) {
 	overview, err := h.service.GetMarketOverview(c.Request.Context())
 	if err != nil {
@@ -113,4 +119,39 @@ func (h *HTTPHandler) GetMarketOverview(c *gin.Context) {
 		Msg:  "success",
 		Data: overview,
 	})
+}
+
+// isIncomplete 判断内存查询结果是否需要回退到 SQLite。
+func isIncomplete(result map[string][]IndexQuote) bool {
+	if len(result) == 0 {
+		return true
+	}
+	for _, quotes := range result {
+		if len(quotes) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeFromSQLite 将 SQLite 查询结果合并到内存结果中。
+// 内存中已有的 (symbol, trade_date) 不会覆盖。
+func mergeFromSQLite(memResult map[string][]IndexQuote, sqliteQuotes []IndexQuote) {
+	// 构建内存已有记录的键集合
+	seen := make(map[string]map[string]bool) // symbol -> trade_date
+	for sym, quotes := range memResult {
+		dates := make(map[string]bool)
+		for _, q := range quotes {
+			dates[q.UpdatedAt.Format("2006-01-02")] = true
+		}
+		seen[sym] = dates
+	}
+
+	for _, q := range sqliteQuotes {
+		dateKey := q.UpdatedAt.Format("2006-01-02")
+		if dates, ok := seen[q.Symbol]; ok && dates[dateKey] {
+			continue // 内存已有，跳过
+		}
+		memResult[q.Symbol] = append(memResult[q.Symbol], q)
+	}
 }
