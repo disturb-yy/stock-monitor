@@ -48,6 +48,13 @@ calendar:
   lookback_months: 6
   lookahead_months: 6
 
+
+
+collector:
+  enabled: true
+  interval_minutes: 5
+  max_history_days: 30
+
 anomaly:
   enabled: true
   rules:

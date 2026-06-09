@@ -15,6 +15,7 @@
 | `calendar.go` | `TradingCalendar`：A 股交易日历缓存与查询 |
 | `service.go` | `Service`：业务服务，委托 Provider 查询 |
 | `http_handler.go` | `HTTPHandler`：Gin HTTP 适配层 |
+| `collector.go` | `HistoryStore` 内存历史存储 + `Collector` 后台定时采集器 |
 
 ## 公开类型
 
@@ -41,6 +42,22 @@ type Provider interface {
 ```
 
 定义在 `domain/market/provider.go`。所有 Provider 实现（Mock、Tushare）均实现在 market 包内，不向外暴露独立接口包。
+
+### 存储与采集
+
+| 类型 | 文件 | 说明 |
+| --- | --- | --- |
+| `HistoryStore` | `collector.go` | 内存历史行情存储，`map[string][]IndexQuote`，`RWMutex` 保护 |
+| `Collector` | `collector.go` | 后台定时采集器，交易时段按 `time.Ticker` 周期拉取 Tushare 行情 |
+
+- `HistoryStore` — 构造函数 `NewHistoryStore(maxDays int) *HistoryStore`
+  - `Append(symbol, quote)` — 追加记录（同日去重 + 自动裁剪旧数据）
+  - `Query(symbol, start, end) (map[string][]IndexQuote, error)` — 按日期范围查询
+- `Collector` — 构造函数 `NewCollector(provider *TushareProvider, store *HistoryStore, calendar *TradingCalendar, intervalMinutes int) *Collector`
+  - `Start(ctx)` — 启动后台采集循环（ticker + goroutine）
+  - `Stop()` — 优雅关闭（停止 ticker，关闭 done channel）
+  - 采集前检查交易日历 + 交易时段，非交易时段跳过
+  - 仅 Tushare 模式生效；Mock 模式下不创建
 
 ### Provider 实现
 
@@ -69,10 +86,16 @@ type HTTPHandler
     func NewHTTPHandler(service *Service) *HTTPHandler
     func (h *HTTPHandler) GetMarketStatus(c *gin.Context)
     func (h *HTTPHandler) GetMarketIndices(c *gin.Context)
+    func (h *HTTPHandler) GetHistory(c *gin.Context)
     func (h *HTTPHandler) GetMarketOverview(c *gin.Context)
 ```
 
 每个方法对应一个 HTTP endpoint，使用 `httputil.Response` 统一响应格式。
+
+**新增端点**: `GET /api/market/history?start=YYYY-MM-DD[&end=YYYY-MM-DD][&symbol=000001.SH]`
+- 查询采集器缓存的历史行情数据
+- `start` 必填，`end` 和 `symbol` 可选
+- 仅在 Tushare 模式且 `collector.enabled=true` 时返回数据
 
 ## 依赖规则
 

@@ -23,7 +23,8 @@ type Config struct {
 	Provider ProviderConfig `yaml:"provider"` // 数据源配置
 	Tushare  TushareConfig  `yaml:"tushare"`  // Tushare API 配置
 	Calendar CalendarConfig `yaml:"calendar"` // 交易日历配置
-	Anomaly  AnomalyConfig  `yaml:"anomaly"`  // 异动检测配置
+	Anomaly   AnomalyConfig   `yaml:"anomaly"`   // 异动检测配置
+	Collector CollectorConfig `yaml:"collector"` // 定时采集配置
 }
 
 // ServerConfig 为 HTTP 服务器配置。
@@ -97,6 +98,14 @@ type AnomalyRuleConfig struct {
 type AnomalyConfig struct {
 	Enabled bool                `yaml:"enabled"` // 是否启用异动检测
 	Rules   []AnomalyRuleConfig `yaml:"rules"`   // 检测规则列表
+}
+
+
+// CollectorConfig 为后台定时采集器配置。
+type CollectorConfig struct {
+	Enabled         bool `yaml:"enabled"`          // 是否启用定时采集
+	IntervalMinutes int  `yaml:"interval_minutes"` // 采集间隔（分钟）
+	MaxHistoryDays  int  `yaml:"max_history_days"` // 每个指数内存最多保留天数
 }
 
 // AuthConfig 转换为 domain/auth.Config 格式。
@@ -186,6 +195,11 @@ func defaultConfig() Config {
 			UpdateIntervalDays: 7,
 			LookbackMonths:     6,
 			LookaheadMonths:    6,
+		},
+		Collector: CollectorConfig{
+			Enabled:         true,
+			IntervalMinutes: 5,
+			MaxHistoryDays:  30,
 		},
 		Anomaly: AnomalyConfig{
 			Enabled: true,

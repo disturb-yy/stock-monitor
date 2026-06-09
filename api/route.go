@@ -39,7 +39,8 @@ func RegisterRoutes(r *gin.Engine, marketHandler *market.HTTPHandler, authHandle
 			UseIf(authCfg.Enabled, auth.JWTMiddleware(authService)).
 			GET("/status", marketHandler.GetMarketStatus).
 			GET("/indices", marketHandler.GetMarketIndices).
-			GET("/overview", marketHandler.GetMarketOverview)
+			GET("/overview", marketHandler.GetMarketOverview).
+			GET("/history", marketHandler.GetHistory)
 
 		// 异动检测接口（条件注册，仅当 anomalyHandler 不为 nil）
 		if anomalyHandler != nil {

@@ -99,8 +99,29 @@ func main() {
 	} else {
 		marketProvider = market.NewMockProvider()
 	}
+	// 创建后台 context（用于采集器生命周期）
+	ctx, cancelCtx := context.WithCancel(context.Background())
+	defer cancelCtx()
+
+	// --- 历史行情存储（采集器填充） ---
+	var historyStore *market.HistoryStore
+	var collector *market.Collector
+
+	// 定时采集器仅在 Tushare 模式且启用时创建
+	if cfg.Provider.Type == "tushare" && cfg.Collector.Enabled {
+		historyStore = market.NewHistoryStore(cfg.Collector.MaxHistoryDays)
+
+		collector = market.NewCollector(
+			marketProvider.(*market.TushareProvider),
+			historyStore,
+			cal,
+			cfg.Collector.IntervalMinutes,
+		)
+		collector.Start(ctx)
+	}
+
 	marketService := market.NewService(marketProvider)
-	marketHandler := market.NewHTTPHandler(marketService)
+	marketHandler := market.NewHTTPHandler(marketService, historyStore)
 
 	// --- 认证领域 ---
 	authConfig := cfg.Auth.AuthConfig()
@@ -122,7 +143,7 @@ func main() {
 
 	// 启动 HTTP 服务
 	go func() {
-		logger.Info(context.Background(), "server started", "addr", server.Addr)
+		logger.Info(ctx, "server started", "addr", server.Addr)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatal("listen failed", "error", err)
 		}
@@ -134,10 +155,15 @@ func main() {
 	<-quit
 
 	// 优雅关闭
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// 先停止采集器，再关闭 HTTP 服务
+	if collector != nil {
+		collector.Stop()
+	}
 
-	if err := server.Shutdown(ctx); err != nil {
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Fatal("server shutdown failed", "error", err)
 	}
 
