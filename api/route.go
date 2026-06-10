@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/disturb-yy/stock-monitor/domain/anomaly"
+	"github.com/disturb-yy/stock-monitor/domain/daily"
 	"github.com/disturb-yy/stock-monitor/domain/auth"
 	"github.com/disturb-yy/stock-monitor/domain/market"
 	"github.com/disturb-yy/stock-monitor/domain/notify"
@@ -21,7 +22,7 @@ import (
 // RegisterRoutes 一次性注册所有路由。
 // 参数由 Composition Root（cmd/server/main.go）注入。
 // notifyHandler 可为 nil（当 Webhook 推送未启用时）。
-func RegisterRoutes(r *gin.Engine, marketHandler *market.HTTPHandler, authHandler *auth.HTTPHandler, authService *auth.Service, authCfg config.AuthConfig, anomalyHandler *anomaly.HTTPHandler, notifyHandler *notify.HTTPHandler) {
+func RegisterRoutes(r *gin.Engine, marketHandler *market.HTTPHandler, authHandler *auth.HTTPHandler, authService *auth.Service, authCfg config.AuthConfig, anomalyHandler *anomaly.HTTPHandler, notifyHandler *notify.HTTPHandler, dailyHandler *daily.HTTPHandler) {
 	// 健康检查路由组
 	v1 := r.Group("/v1")
 	{
@@ -52,6 +53,12 @@ func RegisterRoutes(r *gin.Engine, marketHandler *market.HTTPHandler, authHandle
 		// Webhook 推送历史接口（条件注册，仅当 notifyHandler 不为 nil）
 		if notifyHandler != nil {
 			marketGroup.GET("/alerts/history", notifyHandler.GetHistory)
+		}
+
+		// 每日收盘总结接口（条件注册，仅当 dailyHandler 不为 nil）
+		if dailyHandler != nil {
+			marketGroup.GET("/daily-summary", dailyHandler.GetSummary).
+				POST("/daily-summary", dailyHandler.PostSummary)
 		}
 	}
 }

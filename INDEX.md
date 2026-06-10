@@ -24,14 +24,16 @@ domain/
 
 | 阶段 | 名称 | 状态 | 目标 |
 | --- | --- | --- | --- |
-| Phase 1 | 看得见 | 当前阶段 | 返回 A 股市场状态、主要指数行情、大盘总览 |
-| Phase 2 | 发现异常 | 未开始 | 规则引擎、异动事件、告警通知 |
+| Phase 1 | 看得见 | ✅ 已完成 | 返回 A 股市场状态、主要指数行情、大盘总览 |
+| Phase 2 | 发现异常 | ✅ 已完成 | 规则引擎、异动事件、企业微信告警通知 |
 | Phase 3 | 解释原因 | 未开始 | 市场结构分析、板块贡献、收盘总结 |
 | Phase 4 | 辅助决策 | 未开始 | 市场评分、自定义规则、多市场扩展 |
 
-## 第一阶段功能边界
+## 已实现功能
 
-第一阶段要做：
+### Phase 1: 看得见
+
+
 
 - 定义 A 股市场常量，例如 `CN_A`。（已完成：`domain/market/quote.go`）
 - 定义市场状态，例如 `pre_open`、`trading`、`lunch_break`、`closed`。（已完成）
@@ -47,15 +49,13 @@ domain/
   - `GET /api/market/indices`
   - `GET /api/market/overview`
 
-第一阶段暂不做：
+### Phase 2: 发现异常
 
-- 真实行情源接入。
-- 数据库存储。
-- 定时采集。
-- 监控规则。
-- 告警通知。
-- AI 分析。
-- 前端看板。
+- Tushare 真实行情源接入（`specs/001-tushare-real-provider/`）
+- 交易日历缓存与查询（`specs/002-trading-calendar/`）
+- 多维度异动检测引擎：涨跌幅 / 成交量 / 连续涨跌（`specs/003-anomaly-detection/`）
+- 定时采集 + 历史行情查询 + SQLite 持久化（`specs/004-scheduled-collection/`, `specs/006-sqlite-persistence/`）
+- 企业微信 Webhook 告警推送：冷却去重 / 重试 / 推送历史（`specs/005-webhook-alerts/`）
 
 ## 项目分层
 
@@ -143,7 +143,7 @@ pkg/* -> domain/*
 
 跨领域协作通过 `cmd/server/main.go`（Composition Root）组装。
 
-## 第一阶段请求链路
+## 请求链路
 
 ```plaintext
 HTTP Request
@@ -156,14 +156,27 @@ HTTP Request
   -> pkg/httputil 统一响应格式
 ```
 
-## 第一阶段 API 契约
+## 当前 API 契约
 
 | 接口 | 返回核心数据 | 用途 |
 | --- | --- | --- |
-| `POST /api/auth/token` | JWT Token | 根据 subject 和 extra claims 生成访问 Token |
+| `POST /api/auth/token` | JWT Token | 根据 subject 生成访问 Token |
 | `GET /api/market/status` | `MarketSession` | 判断当前市场是否交易、处于什么阶段 |
 | `GET /api/market/indices` | `[]IndexQuote` | 返回 A 股主要指数行情 |
 | `GET /api/market/overview` | `MarketOverview` | 返回市场状态 + 指数行情的大盘总览 |
+| `GET /api/market/history` | `map[string][]IndexQuote` | 历史行情查询（支持日期范围、symbol 过滤） |
+| `GET /api/market/anomalies` | `{events, count}` | 实时异动检测事件列表 |
+| `GET /api/market/alerts/history` | `{records, total}` | Webhook 告警推送历史（始终可用，webhook 关闭时返回空） |
+| `GET /api/market/daily-summary` | `DailySummary` | 查询当日收盘总结 JSON（含涨跌统计、异动摘要） |
+| `POST /api/market/daily-summary` | — | 手动触发收盘总结推送 |
+
+公开端点（无需认证）：
+
+| 接口 | 用途 |
+| --- | --- |
+| `GET /v1/index` | 服务基本信息 |
+| `GET /v1/ready` | 就绪检查 |
+| `GET /v1/heart` | 心跳检查 |
 
 ## 命名规范
 
@@ -199,8 +212,14 @@ HTTP Request
 | `pkg/middleware/` | [`pkg/middleware/INDEX.md`](pkg/middleware/INDEX.md) |
 | `pkg/router/` | [`pkg/router/INDEX.md`](pkg/router/INDEX.md) |
 | `pkg/tushare/` | [`pkg/tushare/INDEX.md`](pkg/tushare/INDEX.md) |
+| `domain/daily/` | [`domain/daily/INDEX.md`](domain/daily/INDEX.md) |
 
 ## notify 领域
 
 `domain/notify/` — Webhook 告警推送，支持企业微信群机器人。
 详见 [`domain/notify/INDEX.md`](domain/notify/INDEX.md)
+
+## daily 领域
+
+`domain/daily/` — 每日收盘总结，自动生成并推送市场总结。
+详见 [`domain/daily/INDEX.md`](domain/daily/INDEX.md)

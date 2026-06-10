@@ -61,7 +61,7 @@ anomaly:
     - type: price_change
       upper_threshold: 3.0
       lower_threshold: -2.0
-      enabled: true
+      enabled: true  
     - type: volume_spike
       lookback_days: 5
       spike_multiplier: 2.0
@@ -71,7 +71,7 @@ anomaly:
       enabled: true
 
 webhook:
-  enabled: false
+  enabled: true
   webhook_url: ""
   cooldown_minutes: 30
   retry_count: 3
@@ -81,3 +81,7 @@ persistence:
   enabled: true
   db_path: "data/market_history.db"
   max_days: 90
+
+daily_summary:
+  enabled: true
+  push_time: "15:15"

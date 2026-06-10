@@ -27,6 +27,12 @@ func (g *Group) GET(relativePath string, handlers ...gin.HandlerFunc) *Group {
 	return g
 }
 
+// POST 注册 POST 路由并返回 Group 以支持链式调用。
+func (g *Group) POST(relativePath string, handlers ...gin.HandlerFunc) *Group {
+	g.group.POST(relativePath, handlers...)
+	return g
+}
+
 func (g *Group) Native() *gin.RouterGroup {
 	return g.group
 }

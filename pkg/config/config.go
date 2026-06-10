@@ -25,6 +25,7 @@ type Config struct {
 	Calendar CalendarConfig `yaml:"calendar"` // 交易日历配置
 	Anomaly   AnomalyConfig   `yaml:"anomaly"`   // 异动检测配置
 	Webhook   WebhookConfig   `yaml:"webhook"`   // Webhook 告警推送配置
+	DailySummary DailySummaryConfig `yaml:"daily_summary"` // 每日收盘总结配置
 	Persistence PersistenceConfig `yaml:"persistence"` // SQLite 持久化配置
 	Collector CollectorConfig `yaml:"collector"` // 定时采集配置
 }
@@ -113,10 +114,16 @@ type CollectorConfig struct {
 // WebhookConfig 为 Webhook 告警推送配置。
 type WebhookConfig struct {
 	Enabled              bool   `yaml:"enabled"`                 // 是否启用 Webhook 推送
-	WebhookURL           string `yaml:"webhook_url"`             // 企业微信机器人 Webhook URL
+	WebhookURL           string `yaml:"webhook_url"`             // 企业微信机器人 Webhook URL（可通过 WEBHOOK_URL 环境变量覆盖）
 	CooldownMinutes      int    `yaml:"cooldown_minutes"`        // 冷却时间（分钟），0 禁用
 	RetryCount           int    `yaml:"retry_count"`             // 最大重试次数
 	RetryIntervalSeconds int    `yaml:"retry_interval_seconds"`  // 重试间隔（秒）
+}
+
+// DailySummaryConfig 为每日收盘总结推送配置。
+type DailySummaryConfig struct {
+	Enabled  bool   `yaml:"enabled"`   // 是否启用每日收盘总结
+	PushTime string `yaml:"push_time"` // 推送时间（HH:MM），默认 "15:15"
 }
 
 // PersistenceConfig 为 SQLite 持久化配置。
@@ -155,9 +162,12 @@ func Init() {
 
 	conf = &cfg
 
-	// 环境变量覆盖 Tushare Token（避免敏感信息写入配置文件）
+	// 环境变量覆盖（避免敏感信息写入配置文件）
 	if token := os.Getenv("TUSHARE_TOKEN"); token != "" {
 		conf.Tushare.Token = token
+	}
+	if url := os.Getenv("WEBHOOK_URL"); url != "" {
+		conf.Webhook.WebhookURL = url
 	}
 }
 

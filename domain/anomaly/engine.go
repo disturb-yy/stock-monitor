@@ -10,8 +10,9 @@ type EventCallback func(ctx context.Context, events []AnomalyEvent)
 // Engine 是异动检测引擎，负责协调多个 Detector 的执行。
 // 采用管道模式：注册一组检测器，依次执行并聚合结果。
 type Engine struct {
-	detectors []Detector
-	callback  EventCallback // 异动事件回调（可选）
+	detectors  []Detector
+	callback   EventCallback // 异动事件回调（可选）
+	lastEvents []AnomalyEvent // 最近一次检测的事件（供 daily 领域查询）
 }
 
 // NewEngine 创建检测引擎并注册给定的检测器。
@@ -40,10 +41,19 @@ func (e *Engine) Detect(ctx context.Context, current map[string]IndexData, histo
 		allEvents = append(allEvents, events...)
 	}
 
+	// 存储最近一次检测结果（供 daily 领域查询）
+	e.lastEvents = allEvents
+
 	// 异步调用回调，不阻塞检测流程
 	if e.callback != nil && len(allEvents) > 0 {
 		go e.callback(context.Background(), allEvents)
 	}
 
 	return allEvents
+}
+
+// GetLastEvents 返回最近一次检测的异动事件列表。
+// 用于 daily 领域获取当日异动摘要（不重复执行检测）。
+func (e *Engine) GetLastEvents() []AnomalyEvent {
+	return e.lastEvents
 }

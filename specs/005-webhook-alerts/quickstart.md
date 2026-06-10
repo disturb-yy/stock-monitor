@@ -130,7 +130,7 @@ webhook:
 curl -s http://localhost:30080/api/market/anomalies | jq '.code'
 # 预期: 0
 
-# 推送历史路由不注册
+# 推送历史接口始终可用（即使 webhook 未启用也返回空记录）
 curl -s http://localhost:30080/api/market/alerts/history | jq '.code'
-# 预期: 404
+# 预期: 0（data.records 为空数组）
 ```

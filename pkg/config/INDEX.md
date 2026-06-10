@@ -72,7 +72,7 @@ func (c AuthConfig) AuthConfig() auth.Config  // 转换为 domain/auth.Config
 ## 配置来源
 
 - 默认路径：`configs/config.yaml`
-- 环境变量覆盖：`CONFIG_PATH`（指定配置文件路径）、`TUSHARE_TOKEN`（覆盖 tushare.token）
+- 环境变量覆盖：`CONFIG_PATH`（指定配置文件路径）、`TUSHARE_TOKEN`（覆盖 tushare.token）、`WEBHOOK_URL`（覆盖 webhook.webhook_url）
 - 环境变量优先级高于 YAML 文件值
 - 默认值：`defaultConfig()` 内部函数
 
