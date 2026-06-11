@@ -16,7 +16,7 @@
 | `WeComSender` | `NewWeComSender(webhookURL)` | 企业微信机器人 HTTP 发送器 |
 | `CooldownTracker` | `NewCooldownTracker(minutes)` | 冷却去重追踪器 |
 | `HistoryBuffer` | `NewHistoryBuffer(capacity)` | 推送历史环形缓冲区 |
-| `Dispatcher` | `NewDispatcher(sender, cooldown, history, retryCount, retryInterval)` | 推送调度器 |
+| `Dispatcher` | `NewDispatcher(sender, cooldown, history, retryCount, retryInterval)` | 推送调度器（含 `PushContent` 方法，支持原始内容推送） |
 | `Service` | `NewService(dispatcher, enabled)` | 通知服务，通过 `HandleEvents(ctx, []AlertEvent)` 接收告警 |
 | `HTTPHandler` | `NewHTTPHandler(history)` | HTTP 处理器（推送历史查询） |
 

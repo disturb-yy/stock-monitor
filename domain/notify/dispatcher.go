@@ -80,6 +80,20 @@ func (d *Dispatcher) Dispatch(ctx context.Context, events []AlertEvent) {
 	}()
 }
 
+// PushContent 异步推送原始 Markdown 内容。
+// 用于收盘总结等已格式化的消息，不经过冷却过滤。
+// content 为空时不做任何操作。
+func (d *Dispatcher) PushContent(content string) {
+	if content == "" {
+		return
+	}
+	d.wg.Add(1)
+	go func() {
+		defer d.wg.Done()
+		d.sendWithRetry(context.Background(), content, nil)
+	}()
+}
+
 // Wait 等待所有进行中的推送完成（用于优雅关闭）。
 func (d *Dispatcher) Wait() {
 	d.wg.Wait()

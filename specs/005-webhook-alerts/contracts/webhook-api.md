@@ -6,7 +6,7 @@
 
 ### GET /api/alerts/history
 
-查询最近 N 条告警推送记录。仅在企业微信 Webhook 配置启用时注册此路由。
+查询最近 N 条告警推送记录。路由始终注册（即使 webhook 未启用）；webhook 关闭时返回空记录列表。
 
 #### 请求
 

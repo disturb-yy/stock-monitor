@@ -223,12 +223,12 @@ func (c *Collector) collectIfTrading(ctx context.Context) {
 	if !isTrading {
 		slog.Debug("非交易时段，跳过采集",
 			"status", status,
-			"time", now.Format("15:04:05"),
+			"at", now.Format("15:04:05"),
 		)
 		return
 	}
 
-	slog.Info("开始采集行情数据", "time", now.Format("2006-01-02 15:04:05"))
+	slog.Info("开始采集行情数据", "at", now.Format("2006-01-02 15:04:05"))
 	c.collect(ctx)
 }
 
